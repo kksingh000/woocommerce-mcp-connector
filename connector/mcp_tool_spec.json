@@ -1,0 +1,157 @@
+{
+  "mcp_version": "2025-06-18",
+  "server_name": "woocommerce-connector",
+  "description": "Read-only MCP connector for a WooCommerce store: orders and products.",
+  "transport": "stdio",
+  "authentication": {
+    "type": "api_key",
+    "mechanism": "WooCommerce REST API consumer key/secret, passed as query params (consumer_key, consumer_secret) per WooCommerce's own REST API v3 spec",
+    "credentials_source": "environment variables: WOOCOMMERCE_URL, WOOCOMMERCE_CONSUMER_KEY, WOOCOMMERCE_CONSUMER_SECRET",
+    "scopes": "read-only (WooCommerce API keys can be scoped to Read, Write, or Read/Write when generated in wp-admin; this connector only ever issues GET requests)"
+  },
+  "rate_limit_handling": {
+    "strategy": "exponential backoff with jitter",
+    "max_retries": 4,
+    "base_backoff_seconds": 1.0,
+    "honors_retry_after_header": true,
+    "on_exhaustion": "raises a clear error back to the agent rather than hanging or silently failing"
+  },
+  "tools": [
+    {
+      "name": "list_orders",
+      "description": "List store orders, optionally filtered by status.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["pending", "processing", "on-hold", "completed", "cancelled", "refunded", "failed"],
+            "description": "Optional order status filter"
+          },
+          "page": {"type": "integer", "default": 1, "minimum": 1},
+          "per_page": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100}
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "orders": {"type": "array", "items": {"$ref": "#/definitions/order"}},
+          "total": {"type": "integer"},
+          "total_pages": {"type": "integer"},
+          "page": {"type": "integer"}
+        }
+      }
+    },
+    {
+      "name": "get_order",
+      "description": "Get a single order by numeric ID.",
+      "input_schema": {
+        "type": "object",
+        "properties": {"order_id": {"type": "integer"}},
+        "required": ["order_id"]
+      },
+      "output_schema": {"$ref": "#/definitions/order"}
+    },
+    {
+      "name": "search_orders",
+      "description": "Search orders by customer name, email, or order ID substring.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"},
+          "page": {"type": "integer", "default": 1, "minimum": 1},
+          "per_page": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100}
+        },
+        "required": ["query"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "orders": {"type": "array", "items": {"$ref": "#/definitions/order"}},
+          "total": {"type": "integer"},
+          "total_pages": {"type": "integer"},
+          "page": {"type": "integer"}
+        }
+      }
+    },
+    {
+      "name": "list_products",
+      "description": "List store products, optionally filtered by status.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "status": {"type": "string", "enum": ["publish", "draft", "pending", "private"]},
+          "page": {"type": "integer", "default": 1, "minimum": 1},
+          "per_page": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100}
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "products": {"type": "array", "items": {"$ref": "#/definitions/product"}},
+          "total": {"type": "integer"},
+          "total_pages": {"type": "integer"},
+          "page": {"type": "integer"}
+        }
+      }
+    },
+    {
+      "name": "get_product",
+      "description": "Get a single product by numeric ID.",
+      "input_schema": {
+        "type": "object",
+        "properties": {"product_id": {"type": "integer"}},
+        "required": ["product_id"]
+      },
+      "output_schema": {"$ref": "#/definitions/product"}
+    },
+    {
+      "name": "search_products",
+      "description": "Search products by name or SKU.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string"},
+          "page": {"type": "integer", "default": 1, "minimum": 1},
+          "per_page": {"type": "integer", "default": 10, "minimum": 1, "maximum": 100}
+        },
+        "required": ["query"]
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "products": {"type": "array", "items": {"$ref": "#/definitions/product"}},
+          "total": {"type": "integer"},
+          "total_pages": {"type": "integer"},
+          "page": {"type": "integer"}
+        }
+      }
+    }
+  ],
+  "definitions": {
+    "order": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "status": {"type": "string"},
+        "total": {"type": "string"},
+        "currency": {"type": "string"},
+        "customer_id": {"type": "integer"},
+        "billing": {"type": "object"},
+        "line_items": {"type": "array"},
+        "date_created": {"type": "string"}
+      }
+    },
+    "product": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "integer"},
+        "name": {"type": "string"},
+        "sku": {"type": "string"},
+        "price": {"type": "string"},
+        "stock_quantity": {"type": "integer"},
+        "status": {"type": "string"}
+      }
+    }
+  }
+}
